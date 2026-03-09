@@ -1,6 +1,6 @@
-# First-Payment-Default-Prediction
+# First Payment Default Prediction
 
-Supervised binary classification project predicting whether a borrower will default on their first loan payment, using Logistic Regression, SVM, and XGBoost with class imbalance handling and model explainability.
+Supervised binary classification project predicting whether a borrower will default on their first loan payment, using Logistic Regression, SVM, and XGBoost with class imbalance handling, hyperparameter tuning, threshold optimization, and SHAP explainability.
 
 ## Overview
 
@@ -15,38 +15,38 @@ First Payment Default (FPD) is one of the strongest early indicators of loan ris
 
 ## Project Structure
 
-├── Priyal_Vyas.ipynb   
-├── README.md            
+├── First_payment_default.ipynb    
+├── README.md                    
 
 ## Methodology
 
 ### 1. Exploratory Data Analysis
 - Identified missing values across multiple features (27–40% missing in some columns)
-- Dropped features with >50% missing values and the ID column
-- Analyzed skewness — several features showed extreme positive skew (up to 124x)
-- Confirmed severe class imbalance (97% vs 3%)
-- Calculated correlations with target — no single feature strongly predicts default alone
+- Dropped features with >50% missing values and removed the ID column
+- Analyzed skewness across all features — several showed extreme positive skew (up to 124x)
+- Computed Standardized Mean Difference (SMD) to identify features that differ most between defaulters and non-defaulters
+- Computed VIF (Variance Inflation Factor) to detect multicollinearity
+- Confirmed severe class imbalance (97% vs 3%) — accuracy alone is not a meaningful metric
 
 ### 2. Preprocessing
-- **Imputation:** Median imputation for missing values (fit on training data only to prevent leakage)
+- **Imputation:** Median imputation for missing values (fit on training data only to prevent data leakage)
 - **Scaling:** StandardScaler applied after imputation
-- **Data split:** Stratified 70/15/15 train/validation/test split to preserve class ratios
-- **Feature selection:** L1 regularization (Lasso) reduced 81 features to 68 most informative ones
-- **VIF analysis:** Identified multicollinear features for awareness
+- **Data split:** Stratified 70/15/15 train/validation/test split preserving class ratios across all sets
+- **Feature selection:** L1 regularization (Lasso) reduced 81 features to 68 most informative ones, removing noise and improving generalization
 
 ### 3. Class Imbalance Handling
-Two strategies compared:
-- **SMOTE** — synthetic oversampling of minority class
-- **Class weighting** — penalizing misclassification of minority class more heavily
+Two strategies compared on the same model:
 
 | Strategy | PR-AUC |
 |---|---|
-| SMOTE | 0.0448 |
-| Class Weighting | 0.0377 |
+| SMOTE (synthetic oversampling) | 0.0448 |
+| Class weighting | 0.0377 |
 
-SMOTE produced better PR-AUC and was selected for final modeling.
+SMOTE produced better PR-AUC and was used for final model training.
 
 ### 4. Models & Results
+
+Three models trained and evaluated on the validation set:
 
 | Model | ROC-AUC | PR-AUC | F1 |
 |---|---|---|---|
@@ -54,35 +54,52 @@ SMOTE produced better PR-AUC and was selected for final modeling.
 | Linear SVM | 0.652 | 0.066 | 0.081 |
 | XGBoost | 0.616 | 0.051 | 0.094 |
 
-All three models were tuned using RandomizedSearchCV with StratifiedKFold cross-validation.
+Each model includes a written interpretation of its strengths and weaknesses for this specific problem.
 
-### 5. Threshold Tuning
-Default classification threshold (0.5) is suboptimal for imbalanced data. An F1-maximizing threshold search was applied across the range 0.05–0.95, selecting **threshold = 0.47** which improved F1 to **0.097**.
+### 5. Hyperparameter Tuning
+All three models tuned using **RandomizedSearchCV** with **StratifiedKFold (3-fold)** cross-validation, optimizing for F1 score:
 
-### 6. Model Explainability
-Feature importance extracted for the final XGBoost model, identifying the top 10 most influential features driving default predictions.
+- **Logistic Regression:** tuned `C` — best value `0.001`
+- **Linear SVM:** tuned `C` — best value `0.01`
+- **XGBoost:** tuned `n_estimators`, `max_depth`, `learning_rate` — best: 400 trees, depth 4, lr 0.05
+
+### 6. Threshold Tuning
+The default 0.5 classification threshold is suboptimal for imbalanced datasets. An F1-maximizing threshold search was applied across 0.05–0.95, selecting **threshold = 0.47**, which improved the final F1 score to **0.097**.
+
+### 7. Model Explainability
+Two levels of explainability implemented:
+
+- **Feature Importance** — extracted directly from the XGBoost model to identify the top 10 most influential features
+- **SHAP (SHapley Additive exPlanations)** — TreeExplainer applied to a 1,000-sample subset, producing a summary plot showing both feature importance and the direction of each feature's impact on predictions
+
+### 8. Final Test Evaluation
+The final model was evaluated on the held-out test set (never seen during training or tuning), with results reported for both the baseline and improved XGBoost model.
 
 ## Key Findings
 
-- No single feature strongly predicts default — the signal is distributed across many features
+- No single feature strongly predicts default — the predictive signal is distributed across many features
 - Logistic Regression and SVM outperformed XGBoost on recall, catching more defaults
-- XGBoost was more conservative — higher precision but lower recall
+- XGBoost was more conservative — higher precision but missed more defaults
 - Threshold tuning provided a meaningful improvement over the default 0.5 cutoff
-- PR-AUC is the most appropriate metric given the severe class imbalance
+- PR-AUC is the most appropriate metric given the severe class imbalance — accuracy is misleading here
+- SHAP analysis revealed which features push predictions toward default vs non-default
 
 ## Tools & Libraries
 
 - Python, Pandas, NumPy
 - Matplotlib, Seaborn
-- Scikit-learn (LogisticRegression, LinearSVC, StandardScaler, SimpleImputer, SelectKBest, RandomizedSearchCV, StratifiedKFold)
+- Scikit-learn (LogisticRegression, LinearSVC, StandardScaler, SimpleImputer, RandomizedSearchCV, StratifiedKFold)
 - XGBoost
-- Imbalanced-learn (SMOTE, RandomOverSampler, RandomUnderSampler)
+- Imbalanced-learn (SMOTE)
 - SHAP
+- Statsmodels (VIF)
 
 ## How to Run
 
 1. Clone the repository
 2. Upload `kaggle_dataset.csv` to your Google Drive
-3. Open the notebook in Google Colab
+3. Open `First_payment_default.ipynb` in Google Colab
 4. Update the file path in the first cell to match your Drive location
 5. Run all cells in order
+
+> **Note:** Cell 56 references `best_xgb_improved` — ensure this variable is defined earlier in your session before running the final evaluation cell.
